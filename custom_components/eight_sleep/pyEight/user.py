@@ -241,13 +241,15 @@ class EightUser:  # pylint: disable=too-many-public-methods
         # Bed hasn't seen us for 30min so set awake.
         #    stage = 'awake'
 
+        # UNRELIABLE... just rely on the prcessing state 
+        # to determine if there is an ongoing sleep session.
         # Second try at forcing awake using heating level
-        if (
-            stage != "awake"
-            and self.heating_level is not None
-            and self.heating_level < 5
-        ):
-            return "awake"
+        # if (
+        #     stage != "awake"
+        #     and self.heating_level is not None
+        #     and self.heating_level < 5
+        # ):
+        #     return "awake"
         return stage
 
     @property
