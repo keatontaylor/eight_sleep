@@ -48,6 +48,8 @@ ATTR_DEEP_PERC = f"Deep Sleep {PERCENTAGE}"
 ATTR_REM_PERC = f"REM Sleep {PERCENTAGE}"
 ATTR_TNT = "Tosses & Turns"
 ATTR_SLEEP_STAGE = "Sleep Stage"
+ATTR_CURRENT_LEFT_ACTIVITY = "Current Left Activity"
+ATTR_CURRENT_RIGHT_ACTIVITY = "Current Right Activity"
 ATTR_TARGET_HEAT = "Target Heating Level"
 ATTR_ACTIVE_HEAT = "Heating Active"
 ATTR_DURATION_HEAT = "Heating Time Remaining"
@@ -181,6 +183,8 @@ class EightHeatSensor(EightSleepBaseEntity, SensorEntity):
         """Return device state attributes."""
         assert self._user_obj
         return {
+            ATTR_CURRENT_LEFT_ACTIVITY: self._eight._device_json_list[0]['leftKelvin']['currentActivity'],
+            ATTR_CURRENT_RIGHT_ACTIVITY: self._eight._device_json_list[0]['rightKelvin']['currentActivity'],
             ATTR_TARGET_HEAT: self._user_obj.target_heating_level,
             ATTR_ACTIVE_HEAT: self._user_obj.now_heating,
             ATTR_DURATION_HEAT: self._user_obj.heating_remaining,
@@ -293,6 +297,8 @@ class EightUserSensor(EightSleepBaseEntity, SensorEntity):
         state_attr = {ATTR_SESSION_START: attr["date"]}
         state_attr[ATTR_TNT] = attr["tnt"]
         state_attr[ATTR_PROCESSING] = attr["processing"]
+        state_attr["edit_state"] = attr["edit_state"]
+        state_attr["smart_state"] = attr["smart_state"]
 
         if attr.get("breakdown") is not None:
             sleep_time = sum(attr["breakdown"].values()) - attr["breakdown"]["awake"]

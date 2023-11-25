@@ -32,6 +32,9 @@ class EightUser:  # pylint: disable=too-many-public-methods
         self.user_id = user_id
         self.side = side
         self._user_profile: dict[str, Any] = {}
+
+        self.smart_temp: dict[str, Any] = {}
+
         self.trends: list[dict[str, Any]] = []
         self.intervals: list[dict[str, Any]] = []
         self.next_alarm = None
@@ -55,6 +58,13 @@ class EightUser:  # pylint: disable=too-many-public-methods
     def _get_fitness_score(self, trend_num: int, key: str) -> Any:
         """Get fitness score for specified key."""
         return self._get_trend(trend_num, ("sleepFitnessScore", key, "score"))
+
+    def _get_current_smart_state(self) -> str | None:
+        """"Get current smart state."""
+        if "currentState" in self.smart_temp and "type" in self.smart_temp["currentState"]:
+            return self.smart_temp["currentState"]["type"]
+        else:
+            return None
 
     def _get_sleep_score(self, interval_num: int) -> int | None:
         """Return sleep score for a given interval."""
@@ -119,6 +129,11 @@ class EightUser:  # pylint: disable=too-many-public-methods
 
         return breakdown
 
+    def _session_edit_state(self, interval_num: int) -> str | None:
+        if len(self.intervals) < interval_num + 1:
+            return None
+        return self.intervals[interval_num].get("edit")
+     
     def _session_processing(self, interval_num: int) -> bool | None:
         """Return processing state of given session."""
         if len(self.intervals) < interval_num + 1:
@@ -216,6 +231,11 @@ class EightUser:  # pylint: disable=too-many-public-methods
         return self._session_processing(0)
 
     @property
+    def current_edit_state(self) -> str | None:
+        """Return processing session edit state."""
+        return self._session_edit_state(0)
+
+    @property
     def current_sleep_stage(self) -> str | None:
         """Return sleep stage for in-progress session."""
         if (
@@ -229,26 +249,10 @@ class EightUser:  # pylint: disable=too-many-public-methods
         # in a processing state
         if self.current_session_processing:
             stage = stages[-2].get("stage")
+            if stage == "awake":
+                stage = "awake_while_processing"
         else:
             stage = stages[-1].get("stage")
-
-        # UNRELIABLE... Removing for now.
-        # Check sleep stage against last_seen time to make
-        # sure we don't get stuck in a non-awake state.
-        # delta_elap = datetime.fromtimestamp(time.time()) \
-        #    - datetime.strptime(self.last_seen, 'DATE_TIME_ISO_FORMAT')
-        # _LOGGER.debug('User elap: %s', delta_elap.total_seconds())
-        # if stage != 'awake' and delta_elap.total_seconds() > 1800:
-        # Bed hasn't seen us for 30min so set awake.
-        #    stage = 'awake'
-
-        # Second try at forcing awake using heating level
-        if (
-            stage != "awake"
-            and self.heating_level is not None
-            and self.heating_level < 5
-        ):
-            return "awake"
         return stage
 
     @property
@@ -332,6 +336,8 @@ class EightUser:  # pylint: disable=too-many-public-methods
             "resp_rate": self.current_resp_rate,
             "heart_rate": self.current_heart_rate,
             "processing": self.current_session_processing,
+            "edit_state": self.current_edit_state,
+            "smart_state": self.current_smart_state,
         }
 
     @property
@@ -424,6 +430,11 @@ class EightUser:  # pylint: disable=too-many-public-methods
         return self._calculate_interval_data(1, "heartRate")
 
     @property
+    def current_smart_state(self) -> str | None:
+        """Return avg heart rate for last session."""
+        return self._get_current_smart_state()
+
+    @property
     def last_values(self) -> dict[str, Any]:
         """Return a dict of all the 'last' parameters."""
         return {
@@ -436,6 +447,8 @@ class EightUser:  # pylint: disable=too-many-public-methods
             "resp_rate": self.last_resp_rate,
             "heart_rate": self.last_heart_rate,
             "processing": self.last_session_processing,
+            "edit_state": self.current_edit_state,
+            "smart_state": self.current_smart_state,
         }
 
     @property
@@ -632,6 +645,7 @@ class EightUser:  # pylint: disable=too-many-public-methods
         data_for_level = {"currentLevel": level}
         # Catch bad low inputs
         level = max(-100, level)
+
         # Catch bad high inputs
         level = min(100, level)
 
@@ -709,6 +723,9 @@ class EightUser:  # pylint: disable=too-many-public-methods
 
         intervals = await self.device.api_request("get", url)
         self.intervals = intervals.get("intervals", [])
+
+        url = APP_API_URL + f"v1/users/{self.user_id}/temperature"
+        self.smart_temp = await self.device.api_request("get", url)
 
     async def update_routines_data(self) -> None:
         url = APP_API_URL + f"v2/users/{self.user_id}/routines"
